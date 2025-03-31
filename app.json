@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Samadhi",
+    "slug": "buscandocerteza-samadhi",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "myapp",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "android": {
+      "package": "com.buscandocerteza.samadhi",
+    },
+    "ios": {
+      "bundleIdentifier": "com.buscandocerteza.samadhi",
+      "supportsTablet": true
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    },
+  }
+}
