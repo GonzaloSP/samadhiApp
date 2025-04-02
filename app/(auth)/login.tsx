@@ -3,6 +3,12 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image } from 'reac
 import { Link, router } from 'expo-router';
 import { useAuthStore } from '@/stores/auth';
 import { useLanguageStore } from '@/stores/language';
+import Background from '@/components/Background';
+import {
+  GoogleSignin,
+  GoogleSigninButton,
+  statusCodes,
+} from '@react-native-google-signin/google-signin'
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -10,6 +16,10 @@ export default function LoginScreen() {
   const [error, setError] = useState<string | null>(null);
   const signIn = useAuthStore((state) => state.signIn);
   const { t } = useLanguageStore();
+  GoogleSignin.configure({
+    scopes: ['https://www.googleapis.com/auth/drive.readonly'],
+    webClientId: 'YOUR CLIENT ID FROM GOOGLE CONSOLE',
+  })
 
   const handleLogin = async () => {
     try {
@@ -22,6 +32,7 @@ export default function LoginScreen() {
   };
 
   return (
+    <Background>
       <View style={styles.content}>
         <Image
           source={{ uri: 'https://images.unsplash.com/photo-1593811167562-9cef47bfc4d7?q=80&w=600&auto=format&fit=crop' }}
@@ -61,7 +72,14 @@ export default function LoginScreen() {
             <Text style={styles.linkText}>{t('signUp')}</Text>
           </Link>
         </View>
+        <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>{t('or')}</Text>
+            <View style={styles.dividerLine} />
+        </View>
+
       </View>
+      </Background>
   );
 }
 
@@ -130,5 +148,20 @@ const styles = StyleSheet.create({
   linkText: {
     color: '#9775fa',
     fontWeight: '600',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(161, 161, 170, 0.3)',
+  },
+  dividerText: {
+    color: '#a1a1aa',
+    paddingHorizontal: 10,
+    fontSize: 14,
   },
 });

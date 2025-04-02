@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, TextInput, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, TextInput, Modal, AppState, AppStateStatus } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   withTiming,
@@ -19,11 +19,18 @@ import Background from '@/components/Background';
 
 const DURATIONS = [5, 10, 15, 20, 30, 60];
 const LAST_DURATION_KEY = 'lastMeditationDuration';
+const MEDITATION_STATE_KEY = 'meditationState';
 
 interface WebAudio {
   playAsync: () => Promise<void>;
   setPositionAsync: (position: number) => Promise<void>;
   unloadAsync: () => Promise<void>;
+}
+
+interface MeditationState {
+  isActive: boolean;
+  timeLeft: number;
+  endTime: number | null;
 }
 
 export default function MeditationScreen() {
@@ -36,6 +43,8 @@ export default function MeditationScreen() {
   const [customDuration, setCustomDuration] = useState('');
   const { t, language, setLanguage } = useLanguageStore();
   const { user, signOut } = useAuthStore();
+  const appState = useRef(AppState.currentState);
+  const endTimeRef = useRef<number | null>(null);
 
   const pulseStyle = useAnimatedStyle(() => {
     return {
@@ -53,6 +62,72 @@ export default function MeditationScreen() {
       ],
     };
   });
+
+  // Load saved meditation state
+  useEffect(() => {
+    const loadMeditationState = async () => {
+      try {
+        const savedState = await AsyncStorage.getItem(MEDITATION_STATE_KEY);
+        if (savedState) {
+          const state: MeditationState = JSON.parse(savedState);
+          if (state.isActive && state.endTime) {
+            const now = Date.now();
+            if (now < state.endTime) {
+              const remainingTime = Math.ceil((state.endTime - now) / 1000);
+              setTimeLeft(remainingTime);
+              setIsActive(true);
+              endTimeRef.current = state.endTime;
+            } else {
+              // Meditation ended while app was in background
+              await AsyncStorage.removeItem(MEDITATION_STATE_KEY);
+              setIsActive(false);
+              playGong();
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading meditation state:', error);
+      }
+    };
+
+    loadMeditationState();
+  }, []);
+
+  // Handle app state changes
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', async (nextAppState: AppStateStatus) => {
+      if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+        // App has come to foreground
+        if (isActive && endTimeRef.current) {
+          const now = Date.now();
+          if (now < endTimeRef.current) {
+            const remainingTime = Math.ceil((endTimeRef.current - now) / 1000);
+            setTimeLeft(remainingTime);
+          } else {
+            setIsActive(false);
+            endTimeRef.current = null;
+            await AsyncStorage.removeItem(MEDITATION_STATE_KEY);
+            playGong();
+          }
+        }
+      } else if (nextAppState.match(/inactive|background/)) {
+        // App is going to background
+        if (isActive) {
+          const state: MeditationState = {
+            isActive,
+            timeLeft,
+            endTime: endTimeRef.current,
+          };
+          await AsyncStorage.setItem(MEDITATION_STATE_KEY, JSON.stringify(state));
+        }
+      }
+      appState.current = nextAppState;
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [isActive, timeLeft]);
 
   useEffect(() => {
     let sound: Audio.Sound | WebAudio | null = null;
@@ -116,21 +191,28 @@ export default function MeditationScreen() {
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    let isMounted = true;
 
     if (isActive && timeLeft > 0) {
       interval = setInterval(() => {
-        if (isMounted) {
+        const now = Date.now();
+        if (endTimeRef.current && now >= endTimeRef.current) {
+          setIsActive(false);
+          setTimeLeft(0);
+          endTimeRef.current = null;
+          AsyncStorage.removeItem(MEDITATION_STATE_KEY);
+          playGong();
+        } else {
           setTimeLeft((time) => time - 1);
         }
       }, 1000);
     } else if (timeLeft === 0 && isActive) {
       setIsActive(false);
+      endTimeRef.current = null;
+      AsyncStorage.removeItem(MEDITATION_STATE_KEY);
       playGong();
     }
 
     return () => {
-      isMounted = false;
       clearInterval(interval);
     };
   }, [isActive, timeLeft]);
@@ -141,14 +223,26 @@ export default function MeditationScreen() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleReset = () => {
+  const handleReset = async () => {
     setIsActive(false);
     setTimeLeft(selectedDuration * 60);
+    endTimeRef.current = null;
+    await AsyncStorage.removeItem(MEDITATION_STATE_KEY);
   };
 
   const handleStartPause = async () => {
     if (!isActive) {
       await playGong();
+      endTimeRef.current = Date.now() + (timeLeft * 1000);
+      const state: MeditationState = {
+        isActive: true,
+        timeLeft,
+        endTime: endTimeRef.current,
+      };
+      await AsyncStorage.setItem(MEDITATION_STATE_KEY, JSON.stringify(state));
+    } else {
+      endTimeRef.current = null;
+      await AsyncStorage.removeItem(MEDITATION_STATE_KEY);
     }
     setIsActive(!isActive);
   };
@@ -157,6 +251,8 @@ export default function MeditationScreen() {
     setSelectedDuration(duration);
     setTimeLeft(duration * 60);
     setIsActive(false);
+    endTimeRef.current = null;
+    await AsyncStorage.removeItem(MEDITATION_STATE_KEY);
     try {
       await AsyncStorage.setItem(LAST_DURATION_KEY, duration.toString());
     } catch (error) {
@@ -373,7 +469,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 40,
-    transform: [{ translateY: -20 }], // Move the timer up by 20px
+    transform: [{ translateY: -20 }],
   },
   timerButton: {
     alignItems: 'center',
@@ -394,24 +490,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   pulseCircle: {
-    width: 240, // Reduced from 280
-    height: 240, // Reduced from 280
-    borderRadius: 120, // Half of width/height
+    width: 240,
+    height: 240,
+    borderRadius: 120,
     backgroundColor: 'rgba(151, 117, 250, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   innerCircle: {
-    width: 160, // Reduced from 200
-    height: 160, // Reduced from 200
-    borderRadius: 80, // Half of width/height
+    width: 160,
+    height: 160,
+    borderRadius: 80,
     backgroundColor: '#9775fa',
     alignItems: 'center',
     justifyContent: 'center',
   },
   timerText: {
     color: '#fff',
-    fontSize: 40, // Reduced from 48
+    fontSize: 40,
     fontWeight: 'bold',
   },
   modalOverlay: {

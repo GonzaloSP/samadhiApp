@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { Link, router } from 'expo-router';
 import { useAuthStore } from '@/stores/auth';
+import Background from '@/components/Background';
 
 export default function SignUpScreen() {
   const [email, setEmail] = useState('');
@@ -20,6 +21,7 @@ export default function SignUpScreen() {
   };
 
   return (
+    <Background>
       <View style={styles.content}>
         <Image
           source={{ uri: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?q=80&w=600&auto=format&fit=crop' }}
@@ -59,7 +61,9 @@ export default function SignUpScreen() {
             <Text style={styles.linkText}>Sign In</Text>
           </Link>
         </View>
+
       </View>
+      </Background>
   );
 }
 
@@ -85,7 +89,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
-    color: '#a1a1aa',
+    color: 'white',
     textAlign: 'center',
     marginBottom: 32,
   },
