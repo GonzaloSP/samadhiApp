@@ -4,11 +4,6 @@ import { Link, router } from 'expo-router';
 import { useAuthStore } from '@/stores/auth';
 import { useLanguageStore } from '@/stores/language';
 import Background from '@/components/Background';
-import {
-  GoogleSignin,
-  GoogleSigninButton,
-  statusCodes,
-} from '@react-native-google-signin/google-signin'
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -16,10 +11,7 @@ export default function LoginScreen() {
   const [error, setError] = useState<string | null>(null);
   const signIn = useAuthStore((state) => state.signIn);
   const { t } = useLanguageStore();
-  GoogleSignin.configure({
-    scopes: ['https://www.googleapis.com/auth/drive.readonly'],
-    webClientId: 'YOUR CLIENT ID FROM GOOGLE CONSOLE',
-  })
+
 
   const handleLogin = async () => {
     try {
